@@ -2,7 +2,7 @@ import pygame
 import random
 import sys
 import time
-import threading
+
 
 
 
@@ -19,13 +19,18 @@ clock = pygame.time.Clock()
 
 font_big = pygame.font.Font(r"font\monsterRacing.otf", 50)
 font_small = pygame.font.Font(r"font\monsterRacing.otf", 30)
+font_button = pygame.font.Font(r"font\monsterRacing.otf", 20)
 
 
 RED = (255, 0, 0)
+LIGHT_RED = (200, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
-
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+WHITE = (255, 255, 255)
+LIGHT_GRAY = (220, 220, 220)
 
 
 # Loading images
@@ -40,6 +45,10 @@ player_img = pygame.image.load("img\\car_orange2.png")
 player_img = pygame.transform.rotate(player_img, 180)
 player_img = pygame.transform.scale(player_img, (120, 250)).convert_alpha()
 
+home_img = pygame.image.load("img\\home.jpg")
+home_img = pygame.transform.scale(home_img, (WIDTH, HEIGHT)).convert_alpha()
+
+
 player_rect = player_img.get_rect()
 
 bg_music = pygame.mixer.Sound("audio\\bgm1.mp3")
@@ -48,6 +57,8 @@ slow_sound = pygame.mixer.Sound("audio\\slow_car.mp3")
 horn_sound = pygame.mixer.Sound("audio\\horn3.wav")
 brake_sound = pygame.mixer.Sound("audio\\brake.mp3")
 crash_sound = pygame.mixer.Sound("audio\\crash.mp3")
+
+
 
 fast_sound.set_volume(0.3) 
 slow_sound.set_volume(0.3) 
@@ -82,7 +93,6 @@ min_brakeing_speed = 7
 player_x_vel = 5
 player_fast_x_vel = 10
 
-
 bg_music.play(-1)
 
 
@@ -112,6 +122,37 @@ class Car:
                 return True
         return False
     
+
+
+class Button:
+    def __init__(self, x, y, width, height, color, hover_color, border_color, text_color, text, action):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = color
+        self.hover_color = hover_color
+        self.border_color = border_color
+        self.text_color = text_color
+        self.text = text
+        self.action = action
+
+    def draw(self, surface):
+        # Draw background
+        if self.is_mouse_over():
+            pygame.draw.rect(surface, self.hover_color, self.rect, border_radius=10)
+        else:
+            pygame.draw.rect(surface, self.color, self.rect, border_radius=10)
+        
+        # Draw border
+        pygame.draw.rect(surface, self.border_color, self.rect, 2, border_radius=10)
+
+        # Draw text
+        text_surface = font_button.render(self.text, True, self.text_color)
+        text_rect = text_surface.get_rect()
+        text_rect.center = self.rect.center
+        surface.blit(text_surface, text_rect)
+
+    def is_mouse_over(self):
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        return self.rect.collidepoint(mouse_x, mouse_y)
 
 
 
@@ -261,17 +302,54 @@ def show_score():
     score_text = font_small.render(f"Score :{str(score)}", True, YELLOW)
     screen.blit(score_text, (10, 10))
     
+
+def home():
+    global start_time
+    run = True
+    buttons = [Button(150, 360, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Quit", pygame.quit),
+            Button(400, 360, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Start", main)]
+    title_text = font_big.render("Speed Racer", True, RED)
+    home_time = time.time()
+    while run:
+        clock.tick(FPS)
+        screen.blit(home_img, (0, 0))
+        screen.blit(title_text, ((WIDTH - title_text.get_width()) // 2, (HEIGHT - title_text.get_height()) // 2 - 100))
+        for button in buttons:
+            button.draw(screen)
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for button in buttons:
+                    if button.is_mouse_over():
+                        elapsed_pause_time = time.time() - home_time
+                        start_time += elapsed_pause_time
+                        button.action()
+
+
+
+
 def pause():
     global start_time
     pause_time = time.time()
-    game_pause_text = font_big.render("Pause", True, RED)
+    game_pause_text = font_big.render("Pause", True, YELLOW)
     for sound in music_list:
         sound.stop()
+    buttons = [Button(150, 360, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Restart", restart_game),
+                Button(400, 360, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Resume", main),
+                Button(275, 460, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Quit", pygame.quit)]
 
     while True:
         clock.tick(FPS)
-        screen.blit(game_pause_text, ((WIDTH - game_pause_text.get_width()) // 2, (HEIGHT - game_pause_text.get_height()) // 2 - 50))
+        screen.blit(game_pause_text, ((WIDTH - game_pause_text.get_width()) // 2, (HEIGHT - game_pause_text.get_height()) // 2 - 100))
+        for button in buttons:
+            button.draw(screen)
         pygame.display.flip()
+
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -283,15 +361,25 @@ def pause():
                     start_time += elapsed_pause_time
                     main()
 
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for button in buttons:
+                    if button.is_mouse_over():
+                        elapsed_pause_time = time.time() - pause_time
+                        start_time += elapsed_pause_time
+                        button.action()
 
 def game_over():
-    game_over_text = font_big.render("Crashed", True, RED)
+    game_over_text = font_big.render(f"Crashed", True, RED)
     for sound in music_list:
         sound.stop()
     crash_sound.play()
+    buttons = [Button(150, 360, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Quit", pygame.quit),
+            Button(400, 360, 150, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Restart", restart_game)]
     while True:
         clock.tick(FPS)
-        screen.blit(game_over_text, ((WIDTH - game_over_text.get_width()) // 2, (HEIGHT - game_over_text.get_height()) // 2 - 50))
+        screen.blit(game_over_text, ((WIDTH - game_over_text.get_width()) // 2, (HEIGHT - game_over_text.get_height()) // 2 - 100))
+        for button in buttons:
+            button.draw(screen)
         pygame.display.flip()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -300,11 +388,17 @@ def game_over():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     restart_game()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for button in buttons:
+                    if button.is_mouse_over():
+                        button.action()
 
 
 
 def main():
     global background_y, score, start_time
+    pause_button = Button(590, 8, 100, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Pause", pause)
+
     run = True
     while run:
         clock.tick(FPS)
@@ -321,6 +415,10 @@ def main():
                 if speed > 5:
                     score += 2
 
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                    if pause_button.is_mouse_over():
+                        pause_button.action()
 
         keys = pygame.key.get_pressed()
         handle_input(keys) 
@@ -341,7 +439,7 @@ def main():
         show_speed()
         car_sound()
         show_score()
-
+        pause_button.draw(screen)
         # Update and display stopwatch
         minutes, seconds, milliseconds = stopwatch(start_time)
         stop_watch_text = font_small.render(f"{minutes:02}:{seconds:02}.{milliseconds:03}", True, YELLOW)
@@ -370,4 +468,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    home()
