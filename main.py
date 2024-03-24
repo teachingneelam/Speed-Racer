@@ -83,7 +83,9 @@ player_x_vel = 5
 player_fast_x_vel = 10
 
 
-bg_music.play()
+bg_music.play(-1)
+
+
 class Car:
     def __init__(self, image, x, y, speed):
         self.image = image
