@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import time
+import threading
 
 
 
@@ -46,12 +47,14 @@ fast_sound = pygame.mixer.Sound("audio\\fast_car.mp3")
 slow_sound = pygame.mixer.Sound("audio\\slow_car.mp3")
 horn_sound = pygame.mixer.Sound("audio\\horn3.wav")
 brake_sound = pygame.mixer.Sound("audio\\brake.mp3")
+crash_sound = pygame.mixer.Sound("audio\\crash.mp3")
 
 fast_sound.set_volume(0.3) 
 slow_sound.set_volume(0.3) 
-horn_sound.set_volume(0.5) 
+horn_sound.set_volume(1) 
 brake_sound.set_volume(0.3) 
-bg_music.set_volume(0.5)
+bg_music.set_volume(0.3)
+crash_sound.set_volume(1)
 
 music_list = [fast_sound, slow_sound, horn_sound, brake_sound]
 
@@ -64,18 +67,23 @@ car_colors = ["red", "yellow"]
 cars = []
 
 score = 0
+
+#timer event for increasing score every second
 timer_event = pygame.USEREVENT + 1
 pygame.time.set_timer(timer_event, 100) 
 
-
+start_time = time.time()
 
 speed = 0
 max_speed = 20
 acceleration_rate = 0.2
 deceleration_rate = 0.3
-min_brakeing_speed = 3
-player_x_vel = 7
+min_brakeing_speed = 7
+player_x_vel = 5
+player_fast_x_vel = 10
 
+
+bg_music.play()
 class Car:
     def __init__(self, image, x, y, speed):
         self.image = image
@@ -166,13 +174,21 @@ def draw_player():
     screen.blit(player_img, player_rect)
 
 
-def horn():
-    horn_sound.play()
 
+
+def stopwatch(start_time):
+    elapsed_time = time.time() - start_time  # Calculate elapsed time
+    minutes = int(elapsed_time // 60)  # Calculate minutes
+    seconds = int(elapsed_time % 60)   # Calculate seconds
+    milliseconds = int((elapsed_time % 1) * 1000)  # Calculate milliseconds
+    return minutes, seconds, milliseconds
 
 
 def handle_input(keys):
     global background_y, speed
+    if keys[pygame.K_RSHIFT]:
+        horn_sound.play()
+
     if keys[pygame.K_UP]:
         # Accelerate
         speed += acceleration_rate
@@ -196,24 +212,30 @@ def handle_input(keys):
         brake_sound.play()
 
     if keys[pygame.K_RIGHT] and player_rect.x < 515:
-        player_rect.x += player_x_vel
+        if speed >= 10:
+            player_rect.x += player_fast_x_vel
+        else:
+            player_rect.x += player_x_vel
+
     if keys[pygame.K_LEFT] and player_rect.x > 50:
-        player_rect.x -= player_x_vel
+        if speed >= 10:
+            player_rect.x -= player_fast_x_vel
+        else:
+            player_rect.x -= player_x_vel
 
     if keys[pygame.K_ESCAPE]:
         pause()
 
-    if keys[pygame.K_KP_0]:
-        horn()
+
 
     
 
 def restart_game():
-    global cars, speed, score
-    pygame.mixer.stop()
+    global cars, speed, score, start_time
     cars = []
     speed = 0
     score = 0
+    start_time = time.time()
     player_rect.x = (WIDTH - player_img.get_width()) // 2
     player_rect.y = (HEIGHT - player_img.get_height())
     main()
@@ -235,9 +257,11 @@ def show_speed():
 def show_score():
     global score
     score_text = font_small.render(f"Score :{str(score)}", True, YELLOW)
-    screen.blit(score_text, (400, 20))
+    screen.blit(score_text, (10, 10))
     
 def pause():
+    global start_time
+    pause_time = time.time()
     game_pause_text = font_big.render("Pause", True, RED)
     for sound in music_list:
         sound.stop()
@@ -252,6 +276,9 @@ def pause():
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
+                    # Calculate the elapsed time during pause
+                    elapsed_pause_time = time.time() - pause_time
+                    start_time += elapsed_pause_time
                     main()
 
 
@@ -259,6 +286,7 @@ def game_over():
     game_over_text = font_big.render("Crashed", True, RED)
     for sound in music_list:
         sound.stop()
+    crash_sound.play()
     while True:
         clock.tick(FPS)
         screen.blit(game_over_text, ((WIDTH - game_over_text.get_width()) // 2, (HEIGHT - game_over_text.get_height()) // 2 - 50))
@@ -274,15 +302,15 @@ def game_over():
 
 
 def main():
-    global background_y, score
+    global background_y, score, start_time
     run = True
-    bg_music.play(-1)
     while run:
         clock.tick(FPS)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+
             if event.type == timer_event:
                 if speed > 15:
                     score += 10
@@ -311,6 +339,12 @@ def main():
         show_speed()
         car_sound()
         show_score()
+
+        # Update and display stopwatch
+        minutes, seconds, milliseconds = stopwatch(start_time)
+        stop_watch_text = font_small.render(f"{minutes:02}:{seconds:02}.{milliseconds:03}", True, YELLOW)
+        screen.blit(stop_watch_text, (10, 50))
+
         collision, side = check_collision_with_player()
         if collision == True:
             run = False
