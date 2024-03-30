@@ -4,8 +4,6 @@ import sys
 import time
 
 
-
-
 pygame.init()
 pygame.mixer.init()
 
@@ -43,7 +41,7 @@ grass_img = pygame.transform.scale(grass_img, (60, HEIGHT)).convert_alpha()
 
 player_img = pygame.image.load("img\\car_orange2.png")
 player_img = pygame.transform.rotate(player_img, 180)
-player_img = pygame.transform.scale(player_img, (120, 250)).convert_alpha()
+player_img = pygame.transform.scale(player_img, (80, 167)).convert_alpha()
 
 home_img = pygame.image.load("img\\home.jpg")
 home_img = pygame.transform.scale(home_img, (WIDTH, HEIGHT)).convert_alpha()
@@ -57,6 +55,8 @@ slow_sound = pygame.mixer.Sound("audio\\slow_car.mp3")
 horn_sound = pygame.mixer.Sound("audio\\horn3.wav")
 brake_sound = pygame.mixer.Sound("audio\\brake.mp3")
 crash_sound = pygame.mixer.Sound("audio\\crash.mp3")
+mouse_sound = pygame.mixer.Sound("audio\\click.mp3")
+npc_car_horn_sound = pygame.mixer.Sound("audio\\npc_car_horn.mp3")
 
 
 
@@ -66,6 +66,8 @@ horn_sound.set_volume(1)
 brake_sound.set_volume(0.3) 
 bg_music.set_volume(0.3)
 crash_sound.set_volume(1)
+mouse_sound.set_volume(0.5)
+npc_car_horn_sound.set_volume(1) 
 
 music_list = [fast_sound, slow_sound, horn_sound, brake_sound]
 
@@ -86,9 +88,9 @@ pygame.time.set_timer(timer_event, 100)
 start_time = time.time()
 
 speed = 0
-max_speed = 20
-acceleration_rate = 0.2
-deceleration_rate = 0.3
+max_speed = 12
+acceleration_rate = 0.05
+deceleration_rate = 0.2
 min_brakeing_speed = 7
 player_x_vel = 5
 player_fast_x_vel = 10
@@ -154,7 +156,8 @@ class Button:
         mouse_x, mouse_y = pygame.mouse.get_pos()
         return self.rect.collidepoint(mouse_x, mouse_y)
 
-
+    def mouse_sound(self):
+        mouse_sound.play()
 
 def check_collision_with_player():
     for car in cars:
@@ -165,6 +168,7 @@ def check_collision_with_player():
                 return True, None
             else:
                 if player_rect.centerx > car.rect.centerx:
+                
                     return car, "right"  # Collision on the right side of the player's car
                 else:
                     return car, "left"  # Collision on the left side of the player's car
@@ -176,14 +180,16 @@ def check_collision_with_player():
 
     
 def generate_cars():
-    max_cars = 5  # Maximum number of cars on the screen
+    max_cars = 7  # Maximum number of cars on the screen
     if len(cars) < max_cars and random.randint(0, 100) < 1:  
         color = random.choice(car_colors)
         car_image = pygame.image.load("img\\car_{}.png".format(color))
-        car_image = pygame.transform.scale(car_image, (120, 250)).convert_alpha()
+        # car_image = pygame.transform.scale(car_image, (120, 250)).convert_alpha()
+        car_image = pygame.transform.scale(car_image, (80, 167)).convert_alpha()
         car_image = pygame.transform.rotate(car_image, 180)
-        x = random.choice([58, 210, 358, 510])
-        y = -200  # Start above the screen
+        # x = random.choice([58, 210, 358, 510])
+        x = random.randint(60, 545)
+        y = -400  # Start above the screen
         speed = random.randint(6, 10)  # Adjust speed range as needed
         new_car = Car(car_image, x, y, speed)
         # Check collision with existing cars
@@ -239,14 +245,14 @@ def handle_input(keys):
             speed = max_speed
         background_y += speed
         for car in cars:
-            car.move()
+            car.move(speed)
     else:
         # Decelerate
             if speed > 0:
                 speed -= deceleration_rate
                 background_y += speed
                 for car in cars:
-                    car.move()
+                    car.move(speed)
 
     if keys[pygame.K_DOWN] or keys[pygame.K_SPACE]:
         if speed > min_brakeing_speed:
@@ -254,14 +260,14 @@ def handle_input(keys):
         background_y -= speed
         brake_sound.play()
 
-    if keys[pygame.K_RIGHT] and player_rect.x < 515:
-        if speed >= 10:
+    if keys[pygame.K_RIGHT] and player_rect.x < 555:
+        if speed >= 8:
             player_rect.x += player_fast_x_vel
         else:
             player_rect.x += player_x_vel
 
     if keys[pygame.K_LEFT] and player_rect.x > 50:
-        if speed >= 10:
+        if speed >= 8:
             player_rect.x -= player_fast_x_vel
         else:
             player_rect.x -= player_x_vel
@@ -325,6 +331,7 @@ def home():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 for button in buttons:
                     if button.is_mouse_over():
+                        button.mouse_sound()
                         elapsed_pause_time = time.time() - home_time
                         start_time += elapsed_pause_time
                         button.action()
@@ -366,6 +373,7 @@ def pause():
                     if button.is_mouse_over():
                         elapsed_pause_time = time.time() - pause_time
                         start_time += elapsed_pause_time
+                        button.mouse_sound()
                         button.action()
 
 def game_over():
@@ -391,14 +399,15 @@ def game_over():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 for button in buttons:
                     if button.is_mouse_over():
+                        button.mouse_sound()
                         button.action()
 
 
 
 def main():
     global background_y, score, start_time
+    npc_car_horn_sound_played = False
     pause_button = Button(590, 8, 100, 50, RED, LIGHT_RED, YELLOW, YELLOW, "Pause", pause)
-
     run = True
     while run:
         clock.tick(FPS)
@@ -418,6 +427,7 @@ def main():
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                     if pause_button.is_mouse_over():
+                        pause_button.mouse_sound()
                         pause_button.action()
 
         keys = pygame.key.get_pressed()
@@ -455,9 +465,17 @@ def main():
                 collision.rect.x -= 20
             if side == "right":
                 collision.rect.x -= 20
+                if not npc_car_horn_sound_played:
+                    npc_car_horn_sound.play()
+                    npc_car_horn_sound_played = True
+
             if side == "left":
                 collision.rect.x += 20
-        
+                if not npc_car_horn_sound_played:
+                    npc_car_horn_sound.play()
+                    npc_car_horn_sound_played = True
+                
+    
 
 
 
