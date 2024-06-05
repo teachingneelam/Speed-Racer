@@ -46,6 +46,8 @@ player_img = pygame.transform.scale(player_img, (80, 167)).convert_alpha()
 home_img = pygame.image.load("img\\home.jpg")
 home_img = pygame.transform.scale(home_img, (WIDTH, HEIGHT)).convert_alpha()
 
+coin_img = pygame.image.load("img\\coin.png")
+coin_img = pygame.transform.scale(coin_img, (80, 80)).convert_alpha()
 
 player_rect = player_img.get_rect()
 
@@ -85,17 +87,25 @@ score = 0
 timer_event = pygame.USEREVENT + 1
 pygame.time.set_timer(timer_event, 100) 
 
+speed_up_event = pygame.USEREVENT + 2
+pygame.time.set_timer(speed_up_event, 10000)
+
+
+
 start_time = time.time()
 
 speed = 0
 max_speed = 12
-acceleration_rate = 0.05
-deceleration_rate = 0.2
+acceleration_rate = 0.08
+deceleration_rate = 0.05
 min_brakeing_speed = 7
 player_x_vel = 5
 player_fast_x_vel = 10
 
 bg_music.play(-1)
+
+
+speed_up = []
 
 
 class Car:
@@ -159,6 +169,47 @@ class Button:
     def mouse_sound(self):
         mouse_sound.play()
 
+
+class SpeedUp:
+    def __init__(self, img, x, y):
+        self.img = img
+        self.rect = self.img.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.activated = False
+
+    def draw(self, screen):
+        screen.blit(self.img, self.rect)
+    
+    def move(self):
+        self.rect.y += 8
+
+    def collision(self):
+        if player_rect.colliderect(self.rect):
+            return True
+        return False
+    
+    def activate(self):
+        self.draw(screen)
+        self.move()
+        if not self.activated:
+            if self.collision():
+                self.action()
+                self.activated = True
+                speed_up.remove(self)
+
+    
+
+class Coin(SpeedUp):
+    def __init__(self, img, x, y):
+        super().__init__(img, x, y)
+
+    def action(self):
+        if self.collision():
+            increase_score(100)
+
+
+
 def check_collision_with_player():
     for car in cars:
         player_margin_rect = player_rect.inflate(-20, -20)
@@ -196,6 +247,13 @@ def generate_cars():
         if not new_car.check_collision(cars):
             cars.append(new_car)
 
+def generate_speedUp():
+    x = random.randint(80, 560)
+    y = -200
+    coin = Coin(coin_img, x, y)
+    return coin
+
+    
 
 def draw_cars():
     for car in cars:
@@ -257,7 +315,7 @@ def handle_input(keys):
     if keys[pygame.K_DOWN] or keys[pygame.K_SPACE]:
         if speed > min_brakeing_speed:
             speed -= deceleration_rate * (speed/max_speed) 
-        background_y -= speed
+        background_y += speed
         brake_sound.play()
 
     if keys[pygame.K_RIGHT] and player_rect.x < 555:
@@ -300,14 +358,18 @@ def car_sound():
 
 
 def show_speed():
-    speed_text = font_big.render(str(int(5 if speed <= 0 else speed * 10)), True, RED)
+    speed_text = font_big.render(str(int(5 if speed <= 0 else speed * 10)), True, RED if speed > 7 else GREEN)
     screen.blit(speed_text, (500, 550))
 
 def show_score():
-    global score
     score_text = font_small.render(f"Score :{str(score)}", True, YELLOW)
     screen.blit(score_text, (10, 10))
     
+def increase_score(value):
+    global score
+    score += value
+
+
 
 def home():
     global start_time
@@ -424,6 +486,8 @@ def main():
                 if speed > 5:
                     score += 2
 
+            if event.type == speed_up_event:
+                speed_up.append(generate_speedUp())
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                     if pause_button.is_mouse_over():
@@ -441,7 +505,7 @@ def main():
             background_y = 0
 
 
-        screen.fill((0, 200, 0))  # Fill the screen with black background
+        screen.fill((0, 200, 0))  # Fill the screen with green background
         draw_background()
         draw_player()
         generate_cars()
@@ -474,9 +538,9 @@ def main():
                 if not npc_car_horn_sound_played:
                     npc_car_horn_sound.play()
                     npc_car_horn_sound_played = True
-                
     
-
+        for speedup_item in speed_up:
+            speedup_item.activate()
 
 
         pygame.display.flip()
